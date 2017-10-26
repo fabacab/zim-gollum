@@ -100,7 +100,7 @@ main () {
     cd "$TMP_DIR"
     OLD_GIT_DIR="$GIT_DIR"
     GIT_DIR=".git"
-    git branch -a | grep -q "markdown-"
+    git branch -a | grep -q "markdown-$the_ref"
     # Make it if we don't.
     if [ $? -gt 0 ]; then
         git checkout -b markdown-"$the_ref" origin/"$the_ref"
