@@ -16,8 +16,11 @@
 # Constants.
 ZIM_CMD="$(which zim)"
 readonly ZIM_CMD="${ZIM_CMD:-/usr/bin/zim}"
+readonly REPO_DIR="$(basename $(realpath "${GIT_DIR:-$PWD}"))"
 readonly TMP_DIR="$(realpath "${GIT_DIR:-$PWD}/tmp-$$")"
 readonly BUILD_DIR="$(realpath "${GIT_DIR:-$PWD}/build-$$")"
+RUBY_CMD="$(which ruby)"
+readonly RUBY_CMD="${RUBY_CMD:-$HOME/bin/ruby}"
 
 # Read `--push-option`s from the client.
 # Set variables if used by an older Git.
@@ -34,6 +37,31 @@ if [ 0 -lt "$GIT_PUSH_OPTION_COUNT" ]; then
         fi
     done
 fi
+
+#
+# Function: gitfeedScript
+#
+# Param: $1 Path to $GIT_DIR
+# Param: $2 Title of the feed.
+# Param: $3 URL of the feed.
+# Param: $4 Description of the feed.
+#
+gitfeedScript () {
+    cat <<EOF
+require 'rubygems'
+require 'gitfeed'
+
+gf = Gitfeed.new(
+  '${1:-.}',
+  {
+    :title => '${2:-$REPO_DIR}',
+    :url => '${3:-/latest_changes}',
+    :description => '${4:-$REPO_DIR}'
+  }
+)
+puts gf.feed
+EOF
+}
 
 #
 # Function: main
@@ -81,11 +109,20 @@ main () {
         git checkout markdown-"$the_ref"
     fi
 
+    # Move the generated files into the work tree and commit them.
     mv "$BUILD_DIR"/* "$BUILD_DIR"/.* "$TMP_DIR" 2>/dev/null
     git config --local user.name "$(git log -1 --pretty=format:"%an" "$ref")"
     git config --local user.email "$(git log -1 --pretty=format:"%ae" "$ref")"
     git add --all
     git commit -m "$(git log -1 --pretty=format:"%s" "$ref")"
+
+    # Add an RSS feed of the latest changes, too.
+    gitfeedScript > "gitfeed-$$.rb"
+    "$RUBY_CMD" "./gitfeed-$$.rb" > latest_changes.rss
+    rm -f "gitfeed-$$.rb"
+    git add latest_changes.rss
+    git commit --amend -m "$commit_msg"
+
     git push origin markdown-"$the_ref"
 
     # Clean up.
