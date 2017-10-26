@@ -59,38 +59,39 @@ main () {
 
     # Look for the presence of a notebook.zim file.
     git cat-file -e "$ref":notebook.zim 2>/dev/null
-    if [ $? -eq 0 ]; then
-        # Checkout a new copy of the repository.
-        git clone -b "$the_ref" "$GIT_DIR" "$TMP_DIR"
-        # Export from Zim Wiki format to Markdown.
-        "$ZIM_CMD" --export --format markdown --output "$BUILD_DIR" "$TMP_DIR"
-
-        # See if we have a markdown branch.
-        cd "$TMP_DIR"
-        OLD_GIT_DIR="$GIT_DIR"
-        GIT_DIR=".git"
-        git branch -a | grep -q "markdown-"
-        # Make it if we don't.
-        if [ $? -gt 0 ]; then
-            git checkout -b markdown-"$the_ref" origin/"$the_ref"
-            git rm -rf "$TMP_DIR"/*
-        else
-            git checkout markdown-"$the_ref"
-        fi
-
-        mv "$BUILD_DIR"/* "$BUILD_DIR"/.* "$TMP_DIR" 2>/dev/null
-        git config --local user.name "$(git log -1 --pretty=format:"%an" "$ref")"
-        git config --local user.email "$(git log -1 --pretty=format:"%ae" "$ref")"
-        git add --all
-        git commit -m "$(git log -1 --pretty=format:"%s" "$ref")"
-        git push origin markdown-"$the_ref"
-
-        # Clean up.
-        cd -
-        GIT_DIR="$OLD_GIT_DIR"
-        rm -rf "$BUILD_DIR" "$TMP_DIR"
+    if [ $? -eq 1 ]; then
+        return # We have nothing to do!
     fi
-   
+
+    # Checkout a new copy of the repository.
+    git clone -b "$the_ref" "$GIT_DIR" "$TMP_DIR"
+    # Export from Zim Wiki format to Markdown.
+    "$ZIM_CMD" --export --format markdown --output "$BUILD_DIR" "$TMP_DIR"
+
+    # See if we have a markdown branch.
+    cd "$TMP_DIR"
+    OLD_GIT_DIR="$GIT_DIR"
+    GIT_DIR=".git"
+    git branch -a | grep -q "markdown-"
+    # Make it if we don't.
+    if [ $? -gt 0 ]; then
+        git checkout -b markdown-"$the_ref" origin/"$the_ref"
+        git rm -rf "$TMP_DIR"/*
+    else
+        git checkout markdown-"$the_ref"
+    fi
+
+    mv "$BUILD_DIR"/* "$BUILD_DIR"/.* "$TMP_DIR" 2>/dev/null
+    git config --local user.name "$(git log -1 --pretty=format:"%an" "$ref")"
+    git config --local user.email "$(git log -1 --pretty=format:"%ae" "$ref")"
+    git add --all
+    git commit -m "$(git log -1 --pretty=format:"%s" "$ref")"
+    git push origin markdown-"$the_ref"
+
+    # Clean up.
+    cd -
+    GIT_DIR="$OLD_GIT_DIR"
+    rm -rf "$BUILD_DIR" "$TMP_DIR"
 }
 
 # Zhu Li, do the thing!
