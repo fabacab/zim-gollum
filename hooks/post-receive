@@ -76,7 +76,6 @@ main () {
     local ref="$3"
 
     local the_ref=$(echo -n "$ref" | cut -d '/' -f 3)
-    echo "Received a commit to '$the_ref'."
 
     # If the ref we're working with has a `markdown-` prefix, then we
     # don't actually want to do anything.
@@ -91,10 +90,12 @@ main () {
         return # We have nothing to do!
     fi
 
+    echo "Found a notebook.zim file in ${the_ref}."
+
     # Checkout a new copy of the repository.
     git clone -b "$the_ref" "$GIT_DIR" "$TMP_DIR"
     # Export from Zim Wiki format to Markdown.
-    "$ZIM_CMD" --export --format markdown --output "$BUILD_DIR" "$TMP_DIR"
+    "$ZIM_CMD" --export --format markdown --output "$BUILD_DIR" "$TMP_DIR" 2>/dev/null
 
     # See if we have a markdown branch.
     cd "$TMP_DIR"
@@ -103,10 +104,10 @@ main () {
     git branch -a | grep -q "markdown-$the_ref"
     # Make it if we don't.
     if [ $? -gt 0 ]; then
-        git checkout -b markdown-"$the_ref" origin/"$the_ref"
-        git rm -rf "$TMP_DIR"/*
+        git checkout --quiet -b markdown-"$the_ref" origin/"$the_ref"
+        git rm --quiet -rf "$TMP_DIR"/*
     else
-        git checkout markdown-"$the_ref"
+        git checkout --quiet markdown-"$the_ref"
     fi
 
     # Move the generated files into the work tree and commit them.
@@ -114,16 +115,20 @@ main () {
     git config --local user.name "$(git log -1 --pretty=format:"%an" "$ref")"
     git config --local user.email "$(git log -1 --pretty=format:"%ae" "$ref")"
     git add --all
-    git commit -m "$(git log -1 --pretty=format:"%s" "$ref")"
+    git commit --quiet -m "$(git log -1 --pretty=format:"%s" "$ref")"
 
     # Add an RSS feed of the latest changes, too.
+    echo "Publishing RSS feed of latest changes..."
     gitfeedScript > "gitfeed-$$.rb"
     "$RUBY_CMD" "./gitfeed-$$.rb" > latest_changes.rss
     rm -f "gitfeed-$$.rb"
     git add latest_changes.rss
     git commit --amend -m "$commit_msg"
+    echo "Done."
 
-    git push origin markdown-"$the_ref"
+    git push --quiet origin markdown-"$the_ref"
+
+    echo "Exported ${newrev} to markdown format in remote ref 'markdown-${the_ref}'"
 
     # Clean up.
     cd -
